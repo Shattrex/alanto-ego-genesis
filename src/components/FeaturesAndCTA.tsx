@@ -69,6 +69,15 @@ interface FormData {
   personality: string;
 }
 
+// Interface for webhook submission data
+interface SubmissionData {
+  linkedinUrl: string;
+  fullName: string;
+  email: string;
+  phone?: string; // Optional field
+  story: string;
+}
+
 const CtaSection = () => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -128,95 +137,43 @@ const CtaSection = () => {
     setIsSubmitting(true);
 
     try {
-      const webhookUrl = 'https://hook.eu2.make.com/y6uglcn5efu6tp29yts8jgcson5gkiee';
-      
-      // Enhanced data validation
-      if (!formData.email || !formData.fullName || !formData.linkedinUrl) {
+      // Basic validation
+      if (!formData.linkedinUrl || !formData.fullName || !formData.email || !formData.personality) {
         throw new Error('Please fill in all required fields');
       }
 
-      // Format the data for the webhook with enhanced structure
+      // Prepare payload data
       const payload = {
-        submission: {
-          contact: {
-            fullName: formData.fullName.trim(),
-            email: formData.email.trim(),
-            phone: formData.phone ? formData.phone.trim() : undefined,
-            linkedinUrl: formData.linkedinUrl.trim(),
-          },
-          details: {
-            personality: formData.personality.trim(),
-            submissionDate: new Date().toISOString(),
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            source: 'features_cta_form',
-            browserInfo: {
-              userAgent: navigator.userAgent,
-              language: navigator.language,
-              platform: navigator.platform
-            }
-          }
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-          version: '1.0',
-          platform: 'web',
-          environment: import.meta.env.MODE
-        }
+        linkedinUrl: formData.linkedinUrl.trim(),
+        fullName: formData.fullName.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone ? formData.phone.trim() : "",
+        story: formData.personality.trim()
       };
 
-      console.log('Sending form data to webhook:', {
-        url: webhookUrl,
-        payload: JSON.stringify(payload, null, 2)
-      });
+      console.log('Submitting data:', payload);
 
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'User-Agent': 'AlantoAI-Website/1.0',
-          'X-Request-ID': crypto.randomUUID()
-        },
-        body: JSON.stringify(payload),
-        mode: 'cors',
-      });
-
-      console.log('Webhook response status:', response.status);
-      console.log('Webhook response headers:', Object.fromEntries(response.headers.entries()));
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Webhook error response:', errorText);
-        
-        // Enhanced error handling
-        switch (response.status) {
-          case 400:
-            throw new Error('Invalid data format. Please check your input and try again.');
-          case 401:
-            throw new Error('Authentication failed. Please try again later.');
-          case 403:
-            throw new Error('Access denied. Please contact support.');
-          case 429:
-            throw new Error('Too many requests. Please wait a moment and try again.');
-          case 500:
-            throw new Error('Server error. Please try again later or contact support.');
-          case 503:
-            throw new Error('Service temporarily unavailable. Please try again later.');
-          default:
-            throw new Error(`Submission failed: ${response.status} ${response.statusText}`);
+      // Send data using fetch with no-cors mode
+      const response = await fetch(
+        'https://script.google.com/macros/s/AKfycbyUoatEnUd3gxyfe87_4Ym7pxTcsZl6XO4Oa9vNk5dXGoJgL2WJCfbYWh0efi8pQsuB/exec', 
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload),
+          // Use a combination of settings that have been known to work with Google Apps Script
+          mode: 'no-cors', // This prevents CORS errors but makes response unreadable
+          redirect: 'follow',
+          cache: 'no-cache',
         }
-      }
+      );
 
-      // Try to get JSON response if available
-      let responseData;
-      try {
-        responseData = await response.json();
-        console.log('Webhook response data:', responseData);
-      } catch (e) {
-        console.log('No JSON response from webhook');
-      }
-
-      // Reset form on success
+      // With no-cors mode, we won't be able to read the response status or body properly
+      // So we assume success if we get here without errors
+      console.log('Request sent successfully');
+      
+      // Reset form data
       setFormData({
         linkedinUrl: '',
         fullName: '',
@@ -224,12 +181,14 @@ const CtaSection = () => {
         phone: '',
         personality: ''
       });
-
+      
+      // Show success toast
       toast({
         title: "Success!",
-        description: "Your form has been submitted successfully. We will contact you soon.",
+        description: "Your information has been submitted successfully. We'll be in touch soon!",
         variant: "default",
       });
+      
     } catch (error) {
       console.error('Form submission error:', error);
       toast({
